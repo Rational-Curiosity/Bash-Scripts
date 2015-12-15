@@ -1,0 +1,236 @@
+#!/bin/bash
+#LATEXBIN="/usr/local/texlive/2012/bin/x86_64-linux"
+LTXERR="BEGIN{ show = 0 }{ if (\$0 ~ /^.*:[0-9]*:.*$/) { show = 1 }; if (show == 1) print \$0; if (\$0 ~ /^l\\.[0-9]* .*$/) { show = 0 }}"
+RES="" # El valor por defecto de RES se asigna más adelante.
+QUIET=""
+SIZE="11"
+LINEUP=""
+LINEDN=""
+VIEW=""
+MULTI=""
+PRM_TP=""
+for i in "$@"
+do
+  case "$PRM_TP" in
+  res)
+    RES="$i"
+    PRM_TP=""
+    ;;
+  size)
+    SIZE="$i"
+    PRM_TP=""
+    ;;
+  lineup)
+    LINEUP="$i"
+    PRM_TP=""
+    ;;
+  linedn)
+    LINEDN="$i"
+    PRM_TP=""
+    ;;
+  *)
+  case "$i" in
+  --quiet)
+    QUIET="-q"
+    ;;
+  --res)
+    PRM_TP=res
+    ;;
+  --size)
+    PRM_TP=size
+    ;;
+  --lineup)
+    PRM_TP=lineup
+    ;;
+  --linedn)
+    PRM_TP=linedn
+    ;;
+  --view)
+    VIEW="-v"
+    ;;
+  --iesimo)
+    MULTI="-i"
+    ;;
+  -*)
+  for (( j=1; j<${#i}; j++ )); do
+    case "${i:$j:1}" in
+    q)
+      QUIET="-q"
+      ;;
+    r)
+      if [ ! -z "$PRM_TP" ]
+      then
+        echo "Separar opciones: $PRM_TP ${i:$j:1}"
+        exit 1
+      fi
+      PRM_TP=res
+      ;;
+    s)
+      if [ ! -z "$PRM_TP" ]
+      then
+        echo "Separar opciones: $PRM_TP ${i:$j:1}"
+        exit 1
+      fi
+      PRM_TP=size
+      ;;
+    u)
+      if [ ! -z "$PRM_TP" ]
+      then
+        echo "Separar opciones: $PRM_TP ${i:$j:1}"
+        exit 1
+      fi
+      PRM_TP=lineup
+      ;;
+    d)
+      if [ ! -z "$PRM_TP" ]
+      then
+        echo "Separar opciones: $PRM_TP ${i:$j:1}"
+        exit 1
+      fi
+      PRM_TP=linedn
+      ;;
+    v)
+      VIEW="-v"
+      ;;
+    i)
+      MULTI="-i"
+      ;;
+    *)
+      echo "Opción desconocida: ${i:$j:1}"
+      exit 1
+      ;;
+    esac
+  done
+    ;;
+  *)
+  if ([ "${i##*.}" == "tex" ] || [ "${i##*.}" == "ltx" ]) && [ -f "$i" ]
+  then
+    TEX="$i"
+  fi
+    ;;
+  esac
+    ;;
+  esac
+done
+
+if [ -z "$TEX" ]
+then
+  echo "No hemos podido obtener el fichero."
+  exit
+fi
+
+NAME="${TEX%.*}"
+DVI="$NAME".dvi
+PS="$NAME".ps
+EPS="$NAME".eps
+PNG="$NAME".png
+rm -f "$EPS" "$PNG"
+
+awk "BEGIN{EMPTY=0} /\{standalone\}/ { print \"¡Aviso!: No usar documentclass 'standalone', incompatible con 'pst-eps'.\" } /\\\\pagestyle\{empty\}/ {EMPTY=1} END{if (EMPTY == 0) {print \"¡Aviso!: Usar \\\\pagestyle{empty}\"}}" "$TEX"
+
+# Línea peligrosa, mucho cuidado con lo incluido en el .tex
+if [ -z "$LINEUP" ] && [ -z "$LINEDN" ] && [ -z "$RES" ]
+then
+  eval $(awk -F "##" "/%eval/ {print \$2}" "$TEX")
+elif [ -z "$RES" ]
+then
+  # Valor por defecto de RES
+  RES="300"
+fi
+
+latex -interaction=nonstopmode -halt-on-error -file-line-error "$TEX" | awk "$LTXERR"
+if [ -f "$DVI" ] && [ -z "$QUIET" ]; then echo "Generado: $DVI"; else exit; fi
+
+
+if [ -z "$MULTI" ]
+then
+  dvips -q -E "$DVI" -o "$EPS"
+  if [ -f "$EPS" ]; then if [ -z "$QUIET" ]; then echo "Generado: $EPS"; fi; else exit; fi
+
+  if [ ! -z "$LINEUP" ] && [ ! -z "$LINEDN" ]
+  then
+    awk "BEGIN{UP=$LINEUP*($SIZE+6);DN=$LINEDN*($SIZE+6)} \
+    { if (\$0 ~ /^%%BoundingBox:/) { YMAX=\$5+UP; YMIN=\$3-DN; \
+    print \$1 \" \" \$2 \" \" YMIN \" \" \$4 \" \" YMAX} else { print \$0 }}" \
+    "$EPS" > __del__"$NAME"___.tex2png
+    mv __del__"$NAME"___.tex2png "$EPS"
+  fi
+
+  if [ ! -z $(type -p gs) ]
+  then
+    # 'pngalpha' - 32bit RGBA con transparencia
+    # '-dEPSCrop' - ajusta la página a el tamaño del .eps
+    gs -q -dSAFER -dBATCH -dNOPAUSE -sDEVICE=pngalpha -r"$RES" -dEPSCrop -sOutputFile="$PNG" "$EPS"
+  else
+    convert -units PixelsPerInch -density 600 "$EPS" -depth 8 -alpha on -resample "$RES" -quality 90 "$PNG"
+  fi
+
+  if [ -f "$PNG" ]
+  then
+    if [ -z "$QUIET" ]
+    then
+      echo "Generado: $PNG"
+    fi
+    if [ ! -z "$VIEW" ]
+    then
+      eog "$PNG" &
+    fi
+  else
+    echo "Fallo al generar: $PNG"
+    exit
+  fi
+  rm -f "$DVI" "$NAME".log "$NAME".aux "$NAME".out "$NAME".thm
+else
+  dvips -q -i -E "$DVI"
+
+  # save and change IFS 
+  OLDIFS=$IFS
+  IFS=$'\n'
+  # read all file name into an array
+  shopt -s extglob
+  FILES=($(ls -1 "$NAME."+([[:digit:]])))
+  # restore it 
+  IFS=$OLDIFS
+
+  if [ "0" == "${#FILES[@]}" ]
+  then
+    echo "Fallo al generar archivos .eps"
+    exit
+  else
+    if [ -z "$QUIET" ]
+    then
+      echo "Generados archivos .eps"
+    fi
+  fi
+
+  for FILE in "${FILES[@]}"
+  do
+    mv "$FILE" "$FILE.eps"
+    if [ ! -z $(type -p gs) ]
+    then
+    # 'pngalpha' - 32bit RGBA con transparencia
+    # '-dEPSCrop' - ajusta la página a el tamaño del .eps
+    gs -q -dSAFER -dBATCH -dNOPAUSE -sDEVICE=pngalpha -r"$RES" -dEPSCrop -sOutputFile="$FILE.png" "$FILE.eps"
+    else
+      convert -units PixelsPerInch -density 600 "$FILE.eps" -depth 8 -alpha on -resample "$RES" -quality 90 "$FILE.png"
+    fi
+    rm "$FILE.eps"
+  done
+
+  if [ -f "$NAME.001.png" ]
+  then
+    if [ -z "$QUIET" ]
+    then
+      echo "Generados archivos .png"
+    fi
+    if [ ! -z "$VIEW" ]
+    then
+      eog "$PNG" &
+    fi
+  else
+    echo "Fallo al generar archivos .png"
+    exit
+  fi
+  rm -f "$DVI" "$NAME".log "$NAME".aux "$NAME".out "$NAME".thm
+fi
+

@@ -1,0 +1,121 @@
+#!/bin/bash
+#
+# cil [options] common_char_list1 common_char_list2
+#
+#     Concatena las imágenes de 2 listas, imagen a
+# imagen, creando una nueva lista.
+#
+#     -o, --output name   - Nombre de la nueva lista.
+#
+#     -t, --tile [n]x[m]  - Distribución de las imágenes.
+#
+#     -e, --ext extension - Extensión de las imágenes.
+#                             Por defecto png.
+#     -r, --resize        - Redimensiona la imagen para
+#                             vídeo.
+FILES=("")
+OUTPUT="output"
+TILE="x1"
+EXT=".png"
+RESIZE=""
+PRM_TP=""
+# Procesamos los parámetros
+for i in "$@"
+do
+  case "$PRM_TP" in
+  output)
+    OUTPUT="$i"
+    PRM_TP=""
+    ;;
+  tile)
+    TILE="$i"
+    PRM_TP=""
+    ;;
+  ext)
+    EXT=".$i"
+    PRM_TP=""
+    ;;
+  *)
+  case "$i" in
+  --output)
+    PRM_TP=output
+    ;;
+  --tile)
+    PRM_TP=tile
+    ;;
+  --ext)
+    PRM_TP=ext
+    ;;
+  --resize)
+    RESIZE="-r"
+    ;;
+  -*)
+  for (( j=1; j<${#i}; j++ )); do
+    case "${i:$j:1}" in
+    o)
+      if [ ! -z "$PRM_TP" ]
+      then
+        echo "Separar opciones: $PRM_TP ${i:$j:1}"
+        exit 1
+      fi
+      PRM_TP=output
+      ;;
+    t)
+      if [ ! -z "$PRM_TP" ]
+      then
+        echo "Separar opciones: $PRM_TP ${i:$j:1}"
+        exit 1
+      fi
+      PRM_TP=tile
+      ;;
+    e)
+      if [ ! -z "$PRM_TP" ]
+      then
+        echo "Separar opciones: $PRM_TP ${i:$j:1}"
+        exit 1
+      fi
+      PRM_TP=ext
+      ;;
+    r)
+      RESIZE="-r"
+      ;;
+    *)
+      echo "Opción desconocida: ${i:$j:1}"
+      exit 1
+      ;;
+    esac
+  done
+    ;;
+  *)
+  FILES=("${FILES[@]}" "$i")
+    ;;
+  esac
+    ;;
+  esac
+done
+
+LIST1=($(ls "${FILES[1]}"*"$EXT"))
+LIST2=($(ls "${FILES[2]}"*"$EXT"))
+
+TOTAL=${#LIST1[@]}
+ITEM=0
+CONV=0
+TIC=$(date +%s)
+for ((i=0; i<${#LIST1[*]}; i++))
+do
+  ITEM=$((ITEM+1))
+  NAME=$(echo "$OUTPUT$((i+1))" | perl -pe "s/(\\d+)\$/ sprintf(\"%06d$EXT\",\$1) /ge")
+  montage ${LIST1[$i]} ${LIST2[$i]} -mode Concatenate -tile "$TILE" "$NAME"
+  if [ -z "$RESIZE" ]
+  then
+    convert "$NAME" -resize 2048 "$NAME"
+  fi
+  CONV=$((CONV+1))
+  TOC=$(date +%s)
+  ETA=$(((TOC-TIC)*(TOTAL-ITEM)/CONV))
+  HOR=$((ETA/3600))
+  ETA=$((ETA-HOR*3600))
+  MIN=$((ETA/60))
+  ETA=$((ETA-MIN*60))
+  echo -en "\rConcatenado $ITEM/$TOTAL ETA: ${HOR}h ${MIN}m ${ETA}s   "
+done

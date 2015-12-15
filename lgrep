@@ -1,0 +1,15 @@
+#!/bin/bash
+# Primer argumento [REGEXP] segundo argumento PAGINA WEB.
+
+if [ -z "$1" ]
+then
+  echo "Parámetros incorrectos."
+  exit
+fi
+
+if [ -z "$2" ]
+then
+  lynx -dump -listonly "$1" | sed -r -e 's/ *[0-9]*\.? *//'
+else
+  lynx -dump -listonly "$2" | sed -r -e 's/ *[0-9]*\.? *//' | grep -E "$1"
+fi

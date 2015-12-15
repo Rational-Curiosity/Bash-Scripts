@@ -1,0 +1,224 @@
+#!/bin/bash
+## Argumentos: [REGEXP] ARCHIVO_1 ARCHIVO_2 .. [DIRECTORIO] [-dDIRs ARBOL] en cualquier orden.
+## no descarga los ficheros que ya existan.
+
+# Proceso de parámetros.
+ARCHIVOS=""
+NL=$'\n'
+RUTA=""
+EXE="wget"
+INV=""
+PRM_TP=""
+for i in "$@"
+do
+  case "$PRM_TP" in
+  ruta)
+    RUTA="$i"
+    PRM_TP=""
+    ;;
+  inv)
+    INV="$i"
+    PRM_TP=""
+    ;;
+  exe)
+    EXE="$i"
+    PRM_TP=""
+    ;;
+  *)
+  case "$i" in
+  -d)
+    PRM_TP=ruta
+    ;;
+  -v)
+    PRM_TP=inv
+    ;;
+  -x)
+    PRM_TP=exe
+    ;;
+  -*)
+    echo "Opción desconocida: $i"
+    exit
+    ;;
+  *)
+  if [ -d "$i" ]
+  then
+    DIRECTORIO="$i"
+  else
+  if [ -f "$i" ]
+  then
+    ARCHIVOS="$ARCHIVOS$NL$i"
+  else
+    EXPRESION="$i"
+  fi
+  fi
+    ;;
+  esac
+    ;;
+  esac
+done
+ARCHIVOS="${ARCHIVOS##$NL}"
+
+if [ -z "$ARCHIVOS" ]
+then
+  echo "Parámetros incorrectos."
+  exit 1
+fi
+
+
+# Obtención de lista de archivos a descargar.
+if [ -z "$EXPRESION" ]
+then
+  LISTA=$(echo "$ARCHIVOS" | xargs -d $'\n' cat)
+else
+  LISTA=$(echo "$ARCHIVOS" | xargs -d $'\n' grep -h -E "$EXPRESION")
+fi
+
+if [ ! -z "$INV" ]
+then
+  LISTA=$(echo "$LISTA" | grep -v -E "$INV")
+fi
+  
+if [ ! -z "$DIRECTORIO" ]
+then
+  PWD_INICIAL=`pwd`
+  cd "$DIRECTORIO"
+fi
+
+TOTAL=`echo "$LISTA" | wc -l`
+ACTUAL=0
+DESCARGADOS=0
+
+FECHA=`date +%Y%m%d%H%M`
+
+# Comenzamos a cronometrar.
+S_CRONO=`date +%s`
+
+# Comienza el bucle para obtener cada archivo.
+set -f
+IFS=$'\n'
+for i in $LISTA
+do
+  ACTUAL=`expr $ACTUAL + 1`
+
+# Calculamos el archivo destino, lo añadimos al ejecutable y creamos ruta si procede.
+  if [ ! -z "$RUTA" ]
+  then
+    OUTPUT="${i#*$RUTA/}"
+    if [ "$i" == "$OUTPUT" ]
+    then
+      echo "No se ha encontrado $RUTA en URL: $i"
+      echo "$i" >> "wgrep_fallos_$FECHA.log"
+      exit 3
+    fi
+    mkdir -p "${OUTPUT%/*}"
+  else
+    OUTPUT="${i##*/}"
+  fi
+# Comprobamos si existe el archivo.
+  if [ ! -f "$OUTPUT" ]
+# Caso no existe, lo descargamos.
+  then
+# Calculamos datos del proceso global.
+    PORCENTAJE=`expr $DESCARGADOS * 100 / \( $TOTAL - $ACTUAL + $DESCARGADOS + 1 \)`
+
+    L_CRONO=$(expr $(date +%s) - $S_CRONO)
+    MINUTOS=`expr $L_CRONO / 60`
+    HORAS=`expr $MINUTOS / 60`
+    MINUTOS=`expr $MINUTOS % 60`
+    SEGUNDOS=`expr $L_CRONO % 60`
+
+    if [ $MINUTOS -lt 10 ]
+    then
+      MINUTOS="0$MINUTOS"
+    fi
+    if [ $SEGUNDOS -lt 10 ]
+    then
+      SEGUNDOS="0$SEGUNDOS"
+    fi
+
+    USO=$(df "$(pwd)" | awk "{getline; print \$5}")
+
+    echo -e "\n   \033[01;35mProceso Global   $ACTUAL/$TOTAL   $PORCENTAJE %   $HORAS:$MINUTOS:$SEGUNDOS   Uso: $USO\033[00m"
+
+# Efectuamos la descarga.
+# Elección del comando que se usará.
+    case "$EXE" in
+    wget)
+      if [ -z "$RUTA" ]
+      then
+        ( wget "$i" || echo $i >> wgrep_fallos_$FECHA.log ) |& awk "BEGIN{OUT=0} \
+             {if (OUT==0) { if (\$0 ~ /^Longitud/) print; else \
+                if (\$0 ~ /^Grabando/) { print; OUT=1; RS=\" \"}} \
+              else {gsub(/(\n|\.)/, \"\"); if (\$0 ~ /%/) printf \"\r\"; \
+                if (\$0 != \"\") printf \"%10s \", \$0  }}"
+      else
+        ( wget -O "$OUTPUT" "$i" || echo $i >> wgrep_fallos_$FECHA.log ) |& \
+          awk "BEGIN{OUT=0} \
+             {if (OUT==0) { if (\$0 ~ /^Longitud/) print; else \
+                if (\$0 ~ /^Grabando/) { print; OUT=1; RS=\" \"}} \
+              else {gsub(/(\n|\.)/, \"\"); if (\$0 ~ /%/) printf \"\r\"; \
+                if (\$0 != \"\") printf \"%10s \", \$0  }}"
+      fi
+      ;;
+    axel)
+      if [ -z "$RUTA" ]
+      then
+        ( axel -a "$i" || echo $i >> wgrep_fallos_$FECHA.log ) |& awk "BEGIN{OUT=0} \
+             {if (OUT==0) { if (\$0 ~ /^(File|Opening)/) print; else \
+                if (\$0 ~ /^Starting/) { OUT=1; getline; RS=\" \"}} else \
+                  {printf \$0 \" \" }}"
+      else
+        ( axel -a -o "$OUTPUT" "$i" || echo $i >> wgrep_fallos_$FECHA.log ) |& \
+            awk "BEGIN{OUT=0} \
+             {if (OUT==0) { if (\$0 ~ /^(File|Opening)/) print; else \
+                if (\$0 ~ /^Starting/) { OUT=1; getline; RS=\" \"}} else \
+                  {printf \$0 \" \" }}"
+      fi
+      ;;
+    *)
+      echo "Comando desconocido."
+      exit 2
+      ;;
+    esac
+
+    DESCARGADOS=`expr $DESCARGADOS + 1`
+# Caso no existe el archivo, informamos
+  else
+    echo -e "   Existente $ACTUAL/$TOTAL    ${i##*/}"
+    echo "$i" >> "wgrep_existe_$FECHA.log"
+  fi
+done
+
+# Informe final de descargas.
+if [ $DESCARGADOS -eq 0 ]
+then
+    echo "Ningún archivo descargado."
+else
+    PORCENTAJE=`expr $DESCARGADOS * 100 / \( $TOTAL - $ACTUAL + $DESCARGADOS \)`
+
+    L_CRONO=$(expr $(date +%s) - $S_CRONO)
+    MINUTOS=`expr $L_CRONO / 60`
+    HORAS=`expr $MINUTOS / 60`
+    MINUTOS=`expr $MINUTOS % 60`
+    SEGUNDOS=`expr $L_CRONO % 60`
+
+    if [ $MINUTOS -lt 10 ]
+    then
+      MINUTOS="0$MINUTOS"
+    fi
+    if [ $SEGUNDOS -lt 10 ]
+    then
+      SEGUNDOS="0$SEGUNDOS"
+    fi
+
+    USO=$(df "$(pwd)" | awk "{getline; print \$5}")
+
+    echo -e "\n   \033[01;35mProceso Global   $ACTUAL/$TOTAL   $PORCENTAJE %   $HORAS:$MINUTOS:$SEGUNDOS   Uso: $USO Terminado.\033[00m"
+fi
+unset IFS
+set +f
+
+if [ ! -z "$DIRECTORIO" ]
+then
+  cd "$PWD_INICIAL"
+fi
