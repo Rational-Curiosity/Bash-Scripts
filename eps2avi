@@ -1,0 +1,114 @@
+#!/bin/bash
+#
+# eps2avi [options] output_name frame1 frame2 frame3...
+#
+#     Convierte los archivos dados a .png (salvo que ya lo
+# sean o ya estén convertidos) y los junta en un video .avi
+#
+#     -f, --fps fps     - Ajusta los fotogramas por segundo
+#                             (frames per second).
+FILES=("")
+FPS="25"
+PRM_TP=""
+# Procesamos los parámetros
+for i in "$@"
+do
+  case "$PRM_TP" in
+  fps)
+    FPS="$i"
+    PRM_TP=""
+    ;;
+  *)
+  case "$i" in
+  --fps)
+    PRM_TP=fps
+    ;;
+  -*)
+  for (( j=1; j<${#i}; j++ )); do
+    case "${i:$j:1}" in
+    f)
+      if [ ! -z "$PRM_TP" ]
+      then
+        echo "Separar opciones: $PRM_TP ${i:$j:1}"
+        exit 1
+      fi
+      PRM_TP=fps
+      ;;
+    *)
+      echo "Opción desconocida: ${i:$j:1}"
+      exit 1
+      ;;
+    esac
+  done
+    ;;
+  *)
+  FILES=("${FILES[@]}" "$i")
+    ;;
+  esac
+    ;;
+  esac
+done
+OUTPUT=${FILES[1]}
+FILES=(${FILES[@]:2})
+
+
+# Comienzo del programa.
+
+# Archivo temporal donde almacenaremos la lista de fotogramas.
+TMP="__del__lst$(date +%s%N)___.txt"
+echo -n "" > "$TMP"
+
+# Comienza bucle para convertir fichero a fichero.
+TOTAL=${#FILES[@]}
+ITEM=0
+CONV=0
+TIC=$(date +%s)
+for FILE in "${FILES[@]}"
+do
+  PNG="${FILE%.*}.png"
+  # Se convierten sólo ficheros *.eps.
+  if [ "${FILE##*.}" == "eps" ]
+  then
+    ITEM=$((ITEM+1))
+    # Si ya se ha convertido antes no se vuelve a convertir.
+    if [ ! -f "$PNG" ]
+    then
+      if [ ! -z $(type -p gs) ]
+      then
+        # 'pngalpha' - 32bit RGBA con transparencia
+        # '-dEPSCrop' - ajusta la página a el tamaño del .eps
+        gs -q -dSAFER -dBATCH -dNOPAUSE -sDEVICE=pngalpha -r300 -dEPSCrop -sOutputFile="$PNG" "$FILE"
+      elif [ -z $(type -p convert)]
+      then
+        mogrify -format png -density 300 -depth 8 -alpha off -resample 200 -quality 90 "$FILE"
+      else
+        convert -units PixelsPerInch -density 300 "$FILE" -depth 8 -alpha off -resample 200 -quality 90 "$PNG"
+      fi
+      CONV=$((CONV+1))
+      TOC=$(date +%s)
+      ETA=$(((TOC-TIC)*(TOTAL-ITEM)/CONV))
+      HOR=$((ETA/3600))
+      ETA=$((ETA-HOR*3600))
+      MIN=$((ETA/60))
+      ETA=$((ETA-MIN*60))
+      echo -en "\rConvertido $ITEM/$TOTAL para $FPS fps ETA: ${HOR}h ${MIN}m ${ETA}s   "
+    fi
+  fi
+  echo "$PNG" >> "$TMP"
+done
+
+
+#avconv -r 10 -i __del__0xb4e9b2c___%06d.png -r 10 -c:v libx264 -profile:v high -crf 23 -pix_fmt yuv420p -preset slow -b:v 500k -maxrate 500k -bufsize 1000k -vf scale=850:480 -threads 0 -pass 1 -an -f avi /dev/null
+
+#avconv -r 10 -i __del__0xb4e9b2c___%06d.png -r 10 -c:v libx264 -profile:v high -crf 23 -pix_fmt yuv420p -preset slow -b:v 500k -maxrate 500k -bufsize 1000k -vf scale=850:480 -threads 0 -pass 2 -an -f avi "$OUTPUT.avi"
+
+# Finalmente convertimos a .avi en dos pasos para mejorar la eficiencia.
+mencoder "mf://@$TMP" -mf type=png:fps="$FPS" -o /dev/null -ovc x264 -vf scale \
+-x264encopts pass=1:slow_firstpass:bitrate=1600:bframes=1:me=umh:partitions=all:\
+trellis=2:qp_step=4:qcomp=0.8:direct_pred=auto:keyint=200
+
+mencoder "mf://@$TMP" -mf type=png:fps="$FPS" -o "$OUTPUT.avi" -ovc x264 -vf scale \
+-x264encopts pass=2:slow_firstpass:bitrate=1600:bframes=1:me=umh:partitions=all:\
+trellis=2:qp_step=4:qcomp=0.8:direct_pred=auto:keyint=200
+
+rm "$TMP"

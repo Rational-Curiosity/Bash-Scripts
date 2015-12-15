@@ -1,0 +1,48 @@
+#!/bin/bash
+FILES=("")
+EXT=""
+NUM="4"
+PRM_TP=""
+for i in "$@"
+do
+  case "$PRM_TP" in
+  ext)
+    EXT=".$i"
+    PRM_TP=""
+    ;;
+  num)
+    NUM="$i"
+    PRM_TP=""
+    ;;
+  *)
+  case "$i" in
+  -e)
+    PRM_TP=ext
+    ;;
+  -n)
+    PRM_TP=num
+    ;;
+  -*)
+    echo "Opción desconocida: $i"
+    exit 1
+    ;;
+  *)
+  FILES=("${FILES[@]}" "$i")
+    ;;
+  esac
+    ;;
+  esac
+done
+
+
+#set -f
+#IFS=$'\n'
+FILES=(${FILES[@]:1})
+for FILE in "${FILES[@]}"
+do
+    NFILE=$(echo "$FILE" | perl -pe "s/(\\d+)([\^0-9]*)\$/ sprintf(\"%0${NUM}d%s$EXT\",\$1,\$2) /ge")
+    mv "$FILE" "$NFILE"
+done
+#unset IFS
+#set +f
+

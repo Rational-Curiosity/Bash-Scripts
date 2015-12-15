@@ -1,0 +1,46 @@
+#!/bin/bash
+FILE="output_x264"
+LAST=""
+HEAD=""
+FPS="5"
+PRM_TP=""
+for i in "$@"
+do
+  case "$PRM_TP" in
+  head)
+    HEAD="$i"
+    PRM_TP=""
+    ;;
+  fps)
+    FPS="$i"
+    PRM_TP=""
+    ;;
+  *)
+  case "$i" in
+  -l)
+    LAST="-l"
+    ;;
+  -h)
+    PRM_TP=head
+    ;;
+  -fps)
+    PRM_TP=fps
+    ;;
+  -*)
+    echo "Opción desconocida: $i"
+    exit 1
+    ;;
+  *)
+  FILE="$i"
+    ;;
+  esac
+    ;;
+  esac
+done
+
+if [ -z "$LAST" ]
+then
+  mogrify -format jpg -depth 8 -alpha off -density 300 -resample 50 -quality 80 "$HEAD"*.eps
+fi
+
+avconv -y -r $FPS -i "$HEAD"%03d.png -b:v libx264 -r $FPS -b 255k -aspect 4:3 -s 320x240 "$FILE.avi"

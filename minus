@@ -1,0 +1,20 @@
+#!/bin/bash
+if [ -z $2 ]
+then
+    echo usage: minus main_file list_to_remove_from_main_file
+    exit
+fi
+
+set -f
+IFS=$'\n'
+
+FILE=$(cat $1)
+for i in $(cat $2)
+do
+    FILE=$(echo "$FILE" | sed -e "0,/^$i$/{//d;}")
+done
+
+echo "$FILE"
+
+unset IFS
+set +f

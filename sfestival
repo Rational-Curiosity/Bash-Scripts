@@ -1,0 +1,3 @@
+#!/bin/bash
+TEXTO=$(echo "$*" | iconv -f utf-8 -t iso-8859-1 | sed "s/[\"']//g")
+eval "festival '(voice_JuntaDeAndalucia_es_sf_diphone)' '(SayText \"$TEXTO\")' '(exit)'"
