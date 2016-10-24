@@ -8,14 +8,14 @@ colog [<color1> <pattern11> <pattern12> ...] [<color2> <pattern21> <pattern22> .
 
 ** Colors
 
-#+BEGIN_VERSE
+#+BEGIN_SRC sh
 -r|--red
 -g|--green
 -y|--yellow
 -b|--blue
 -m|--magenta
 -c|--cyan
-#+END_VERSE
+#+END_SRC
 
 ** Patterns
 
@@ -23,9 +23,9 @@ regex patterns.
 
 ** Other options
 
-#+BEGIN_VERSE
+#+BEGIN_SRC sh
 -l|--log or without arguments
-#+END_VERSE
+#+END_SRC
 
 Colorize 'ERROR' with red, 'DEBUG' with green, 'WARN' with yellow, 'INFO' with blue
 and numbers with cyan.
