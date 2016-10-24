@@ -1,10 +1,10 @@
 #!/bin/bash
 # Primer argumento [REGEXP] segundo argumento PAGINA WEB.
 
-if [ -z "$1" ]
+if [ -z "$2" ]
 then
-  echo "Parámetros incorrectos."
-  exit
+  echo "usage: lgrep <regexp> <web page>"
+  exit 1
 fi
 
 if [ -z "$2" ]

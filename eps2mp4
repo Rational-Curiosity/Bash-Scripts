@@ -43,4 +43,4 @@ then
   mogrify -format jpg -depth 8 -alpha off -density 300 -resample 50 -quality 80 "$HEAD"*.eps
 fi
 
-avconv -y -r $FPS -i "$HEAD"%03d.png -b:v libx264 -r $FPS -b 255k -aspect 4:3 -s 320x240 "$FILE.avi"
+avconv -y -r $FPS -i "$HEAD"%03d.png -b:v libx264 -r $FPS -b:v 255k -aspect 4:3 -s 320x240 "$FILE.avi"

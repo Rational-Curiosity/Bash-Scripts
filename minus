@@ -1,8 +1,8 @@
 #!/bin/bash
 if [ -z $2 ]
 then
-    echo usage: minus main_file list_to_remove_from_main_file
-    exit
+    echo usage: minus <main_file> <list_to_remove_from_main_file>
+    exit 1
 fi
 
 set -f

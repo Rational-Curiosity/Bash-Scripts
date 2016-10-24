@@ -1,0 +1,31 @@
+#+title: Bash Scripts
+
+* colog
+
+#+BEGIN_SRC sh
+colog [<color1> <pattern11> <pattern12> ...] [<color2> <pattern21> <pattern22> ...] ... 
+#+END_SRC
+
+** Colors
+
+#+BEGIN_VERSE
+-r|--red
+-g|--green
+-y|--yellow
+-b|--blue
+-m|--magenta
+-c|--cyan
+#+END_VERSE
+
+** Patterns
+
+regex patterns.
+
+** Other options
+
+#+BEGIN_VERSE
+-l|--log or without arguments
+#+END_VERSE
+
+Colorize 'ERROR' with red, 'DEBUG' with green, 'WARN' with yellow, 'INFO' with blue
+and numbers with cyan.
