@@ -2,7 +2,7 @@
 
 * COLOG
 
-Colorize outputs
+Highlight matches
 
 #+BEGIN_SRC sh
 colog [<color1> <pattern11> <pattern12> ...] [<color2> <pattern21> <pattern22> ...] ... 
