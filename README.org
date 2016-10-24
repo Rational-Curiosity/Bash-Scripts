@@ -1,6 +1,8 @@
 #+title: Bash Scripts
 
-* colog
+* COLOG
+
+Colorize outputs
 
 #+BEGIN_SRC sh
 colog [<color1> <pattern11> <pattern12> ...] [<color2> <pattern21> <pattern22> ...] ... 
@@ -29,3 +31,46 @@ regex patterns.
 
 Colorize 'ERROR' with red, 'DEBUG' with green, 'WARN' with yellow, 'INFO' with blue
 and numbers with cyan.
+
+#+BEGIN_SRC sh
+-s|--sensitive
+#+END_SRC
+
+Case sensitive.
+
+** Example
+
+#+BEGIN_SRC sh
+echo warn error debug info 10 nil | colog
+#+END_SRC
+
+
+* MINUS
+
+Subtract list
+
+#+BEGIN_SRC sh
+minus <file1> <file2>
+#+END_SRC
+
+=file1=
+
+#+BEGIN_VERBATIM
+A
+B
+C
+D
+#+END_VERBATIM
+
+=file2=
+
+#+BEGIN_VERBATIM
+A
+D
+#+END_VERBATIM
+
+#+BEGIN_SRC sh
+$ minus file1 file2
+B
+C
+#+END_SRC
