@@ -1,0 +1,148 @@
+#!/bin/bash
+
+CASE=i
+
+case_color () {
+    case "${COLOR,,}" in
+    r)
+        RED="$RED|$1"
+        ;;
+    g)
+        GREEN="$GREEN|$1"
+        ;;
+    y)
+        YELLOW="$YELLOW|$1"
+        ;;
+    b)
+        BLUE="$BLUE|$1"
+        ;;
+    m)
+        MAGENTA="$MAGENTA|$1"
+        ;;
+    c)
+        CYAN="$CYAN|$1"
+        ;;
+    esac
+}
+
+build_run () {
+    RUN="cat - "
+    if [ -n "$CYAN" ]
+    then
+        RUN="$RUN | GREP_COLORS='mt=01;36' grep --color=always -${CASE}aE \"$CYAN\""
+    fi
+    if [ -n "$RED" ]
+    then
+        RUN="$RUN | GREP_COLORS='mt=01;31' grep --color=always -${CASE}aE \"$RED\""
+    fi
+    if [ -n "$GREEN" ]
+    then
+        RUN="$RUN | GREP_COLORS='mt=01;32' grep --color=always -${CASE}aE \"$GREEN\""
+    fi
+    if [ -n "$YELLOW" ]
+    then
+        RUN="$RUN | GREP_COLORS='mt=01;33' grep --color=always -${CASE}aE \"$YELLOW\""
+    fi
+    if [ -n "$BLUE" ]
+    then
+        RUN="$RUN | GREP_COLORS='mt=01;34' grep --color=always -${CASE}aE \"$BLUE\""
+    fi
+    if [ -n "$MAGENTA" ]
+    then
+        RUN="$RUN | GREP_COLORS='mt=01;35' grep --color=always -${CASE}aE \"$MAGENTA\""
+    fi
+}
+
+if [ "$#" -eq 0 ]
+then
+    RED="ERROR|"
+    GREEN="DEBUG|"
+    YELLOW="WARN|"
+    BLUE="INFO|"
+    MAGENTA=""
+    CYAN="[0-9]|"
+else
+    COLOR="red"
+    RED=""
+    GREEN=""
+    YELLOW=""
+    BLUE=""
+    MAGENTA=""
+    CYAN=""
+    while [ "$#" -gt 0 ]
+    do
+        case "$1" in
+        '-r'|'--red')
+            COLOR="r"
+            shift
+            ;;
+        '-g'|'--green')
+            COLOR="g"
+            shift
+            ;;
+        '-y'|'--yellow')
+            COLOR="y"
+            shift
+            ;;
+        '-b'|'--blue')
+            COLOR="b"
+            shift
+            ;;
+        '-m'|'--magenta')
+            COLOR="m"
+            shift
+            ;;
+        '-c'|'--cyan')
+            COLOR="c"
+            shift
+            ;;
+        '-l'|'--log')
+            RED="$RED|ERROR"
+            GREEN="$GREEN|DEBUG"
+            YELLOW="$YELLOW|WARN"
+            BLUE="$BLUE|INFO"
+            CYAN="$CYAN|[0-9]"
+            shift
+            ;;
+        '-s'|'--sensitive')
+            CASE=''
+            shift
+            ;;
+        '--update')
+            NAME=colog
+            LIST="$(perl -ne "if (/^ *'([^']+)'\)$/) { print \"\n\$1\" } if (/^ *'([^']+)'\|'([^']+)'\)$/) { print \"\n\$1\n\$2\" }" ~/bin/$NAME | sort -u | tr '\n' ' ')"
+            LIST="${LIST:1:-1}"
+            echo "New option list: $LIST."
+            perl -lne "if (/[^#]*#_$NAME use=/) { print '    use=\"$LIST\" #_$NAME use=' } else { print }" -i ~/etc/completion.bash
+            exit 0
+            ;;
+        *)
+            case_color "$1"
+            shift
+            ;;
+        esac
+    done
+fi
+
+build_run
+
+while true
+do
+    if read -t 0 captured < /dev/tty
+    then
+        read captured < /dev/tty
+        if [ -n "$captured" ]
+        then
+            read -p "Color [rgybmc]: " -n 1 COLOR < /dev/tty
+            echo
+            read -p "Pattern: " PATTERN < /dev/tty
+            case_color "$PATTERN"
+            build_run
+        fi
+    fi
+    if read -t 0 line < /dev/stdin
+    then
+       read line < /dev/stdin || exit 0
+       echo "$line" | eval "$RUN"
+    fi
+done
