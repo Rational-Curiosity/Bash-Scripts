@@ -55,19 +55,19 @@ minus <file1> <file2>
 
 =file1=
 
-#+BEGIN_VERBATIM
+#+BEGIN_SRC fundamental
 A
 B
 C
 D
-#+END_VERBATIM
+#+END_SRC
 
 =file2=
 
-#+BEGIN_VERBATIM
+#+BEGIN_SRC fundamental
 A
 D
-#+END_VERBATIM
+#+END_SRC
 
 #+BEGIN_SRC sh
 $ minus file1 file2
