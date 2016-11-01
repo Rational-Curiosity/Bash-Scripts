@@ -1,6 +1,7 @@
 #!/bin/bash
 
 CASE=i
+TAIL='false'
 
 case_color () {
     case "${COLOR,,}" in
@@ -26,6 +27,7 @@ case_color () {
 }
 
 build_run () {
+    CONCAT="${RED:1}$GREEN$YELLOW$BLUE$MAGENTA$CYAN"
     RUN="cat - "
     if [ -n "$CYAN" ]
     then
@@ -53,14 +55,29 @@ build_run () {
     fi
 }
 
+user_input () {
+    if read -t 0 captured < /dev/tty
+    then
+        read captured < /dev/tty
+        if [ -n "$captured" ]
+        then
+            read -p "Color [rgybmc]: " -n 1 COLOR < /dev/tty
+            echo
+            read -p "Pattern: " PATTERN < /dev/tty
+            case_color "$PATTERN"
+            build_run
+        fi
+    fi
+}
+
 if [ "$#" -eq 0 ]
 then
-    RED="ERROR|"
-    GREEN="DEBUG|"
-    YELLOW="WARN|"
-    BLUE="INFO|"
-    MAGENTA=""
-    CYAN="[0-9]|"
+    RED="|ERRORE?S?"
+    GREEN="|DEBUG"
+    YELLOW="|WARN(ING)?"
+    BLUE="|INFO(RMA[TC]I[OÓ]N)?"
+    MAGENTA="|EVENTO?S?"
+    CYAN="|[0-9]"
 else
     COLOR="red"
     RED=""
@@ -97,15 +114,20 @@ else
             shift
             ;;
         '-l'|'--log')
-            RED="$RED|ERROR"
+            RED="$RED|ERRORE?S?"
             GREEN="$GREEN|DEBUG"
-            YELLOW="$YELLOW|WARN"
-            BLUE="$BLUE|INFO"
+            YELLOW="$YELLOW|WARN(ING)?"
+            BLUE="$BLUE|INFO(RMA[TC]I[OÓ]N)?"
+            MAGENTA="$MAGENTA|EVENTO?S?"
             CYAN="$CYAN|[0-9]"
             shift
             ;;
         '-s'|'--sensitive')
             CASE=''
+            shift
+            ;;
+        '-t'|'--tail')
+            TAIL=''
             shift
             ;;
         '--update')
@@ -115,6 +137,49 @@ else
             echo "New option list: $LIST."
             perl -lne "if (/[^#]*#_$NAME use=/) { print '    use=\"$LIST\" #_$NAME use=' } else { print }" -i ~/etc/completion.bash
             exit 0
+            ;;
+        -*)
+            for (( j=1; j<${#1}; j++ ))
+            do
+                case "${1:$j:1}" in
+                r)
+                    COLOR="r"
+                    ;;
+                g)
+                    COLOR="g"
+                    ;;
+                y)
+                    COLOR="y"
+                    ;;
+                b)
+                    COLOR="b"
+                    ;;
+                m)
+                    COLOR="m"
+                    ;;
+                c)
+                    COLOR="c"
+                    ;;
+                l)
+                    RED="$RED|ERROR"
+                    GREEN="$GREEN|DEBUG"
+                    YELLOW="$YELLOW|WARN"
+                    BLUE="$BLUE|INFO"
+                    CYAN="$CYAN|[0-9]"
+                    ;;
+                s)
+                    CASE=''
+                    ;;
+                t)
+                    TAIL=''
+                    ;;
+                *)
+                    >&2 echo "Unknow option: -${1:$j:1}"
+                    exit 1
+                    ;;
+                esac
+            done
+            shift
             ;;
         *)
             case_color "$1"
@@ -126,23 +191,32 @@ fi
 
 build_run
 
-while true
-do
-    if read -t 0 captured < /dev/tty
-    then
-        read captured < /dev/tty
-        if [ -n "$captured" ]
+if [ -z "$TAIL" ]
+then
+    while true
+    do
+        user_input
+        if read -t 0 line < /dev/stdin
         then
-            read -p "Color [rgybmc]: " -n 1 COLOR < /dev/tty
-            echo
-            read -p "Pattern: " PATTERN < /dev/tty
-            case_color "$PATTERN"
-            build_run
+            read line < /dev/stdin || break
+            if echo "$line" | grep -${CASE}aE "$CONCAT" &> /dev/null
+            then
+                TAIL+="
+$line"
+            else
+                echo "$line" | eval "$RUN"
+            fi
         fi
-    fi
-    if read -t 0 line < /dev/stdin
-    then
-       read line < /dev/stdin || exit 0
-       echo "$line" | eval "$RUN"
-    fi
-done
+    done
+    echo "${TAIL:1}" | eval "$RUN"
+else
+    while true
+    do
+        user_input
+        if read -t 0 line < /dev/stdin
+        then
+            read line < /dev/stdin || break
+            echo "$line" | eval "$RUN"
+        fi
+    done
+fi
