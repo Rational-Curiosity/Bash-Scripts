@@ -1,0 +1,116 @@
+#!/bin/bash -i
+# Add to remote rc file: if [ -n "$(type -t __init__)" ]; then __init__; fi
+
+RUN="ssh"
+CMDS=""
+HOST=""
+DSHIFT=""
+TARGET="Unknow"
+while [ "$#" -gt 0 ]
+do
+    case "$1" in
+    '--update')
+        NAME=sshs
+        LIST="$(printf " %s" $(sed -n "s/^ *'\([^']\+\)')$/\1/p" ~/bin/$NAME))"
+        LIST="${LIST:1}"
+        sed -i "s/[^#]*#_$NAME use=/  use=\"${LIST//\//\\\/}\" #_$NAME use=/" ~/etc/completion.bash
+        shift
+        ;;
+    -*)
+        for (( j=1; j<${#1}; j++ )); do
+            case "${1:$j:1}" in
+            t)
+                RUN="$RUN -t"
+                if [ -f ~/bin/goto ]
+                then
+                    CMDS=' "goto () {
+$(cat ~/bin/goto | sed '"'"'s/^ *//; /^$/d'"'"')
+}'
+                else
+                    CMDS=' "$(declare -f goto)'
+                fi
+                if [ -f ~/bin/sshs ]
+                then
+                    CMDS+='
+sshs () {
+$(cat ~/bin/sshs | sed '"'"'s/^ *//; /^$/d'"'"')
+}'
+                else
+                    CMDS+='
+$(declare -f sshs)'
+                fi
+                if [ -f ~/bin/colog ]
+                then
+                    CMDS+='
+colog () {
+$(cat ~/bin/colog | sed '"'"'s/^ *//; /^$/d'"'"')
+}'
+                else
+                    CMDS+='
+$(declare -f colog)'
+                fi
+                CMDS+='
+export -f goto
+$(declare -f _goto)
+export -f _goto
+export -f sshs
+$(declare -f _sshs)
+export -f _sshs
+export -f colog
+" "bash --init-file <(echo '"'"'. .profile; complete -o default -o nospace -F _goto goto; complete -o default -o nospace -F _sshs sshs; export PS1=$(printf "%q" "$PS1")'"'"')"'
+                ;;
+            X)
+                RUN="$RUN -X"
+                ;;
+            Y)
+                RUN="$RUN -Y"
+                ;;
+            p)
+                RUN="$RUN -p $2"
+                DSHIFT="true"
+                ;;
+            *)
+                >&2 echo "Opción desconocida: ${i:$j:1}"
+                HOST=""
+                break
+                ;;
+            esac
+        done
+        shift
+        if [ -n "$DSHIFT" ]
+        then
+            DSHIFT=""
+            shift
+        fi
+        ;;
+    *)
+        if [ -n "$HOST" ]
+        then
+            >&2 echo "Varios hosts introducidos"
+            HOST=""
+            break
+        fi
+        HOST="$1"
+        shift
+        ;;
+    esac
+done
+
+if [ -n "$HOST" ]
+then
+    case "$HOST" in
+    'ev3')
+        RUN="$RUN ev3@10.42.0.83"
+        ;;
+    *)
+        TARGET="$HOST"
+        RUN="$RUN $HOST"
+        ;;
+    esac
+
+    RUN="$RUN$CMDS"
+
+    echo -ne "\033]0;ssh - $TARGET\007"
+    echo "$RUN"
+    eval "$RUN"
+fi

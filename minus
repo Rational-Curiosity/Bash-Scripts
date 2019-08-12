@@ -1,20 +1,30 @@
 #!/bin/bash
+## grep -vxf <(echo "$b") <(echo "$a") # a - b
 if [ -z $2 ]
 then
     echo "usage: minus <main_file_list> <file_list_to_remove_from_main_file_list>"
     exit 1
 fi
+grep -Fvxf "$2" "$1"
 
-set -f
-IFS=$'\n'
+# [ bash script
+# if [ -z $2 ]
+# then
+#     echo "usage: minus <main_file_list> <file_list_to_remove_from_main_file_list>"
+#     exit 1
+# fi
 
-FILE=$(cat $1)
-for i in $(cat $2)
-do
-    FILE=$(echo "$FILE" | sed -e "0,/^$i$/{//d;}")
-done
+# set -f
+# IFS=$'\n'
 
-echo "$FILE"
+# FILE=$(cat $1)
+# for i in $(cat $2)
+# do
+#     FILE=$(echo "$FILE" | sed -e "0,/^$i$/{//d;}")
+# done
 
-unset IFS
-set +f
+# echo "$FILE"
+
+# unset IFS
+# set +f
+# ]
