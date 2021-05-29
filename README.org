@@ -2,7 +2,7 @@
 
 * EASYFOCUS
 
-bspwm keyboard driven window selection
+[[https://github.com/baskerville/bspwm][bspwm]] keyboard driven window selection
 
 ** Requirements
 
