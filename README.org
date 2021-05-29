@@ -1,5 +1,19 @@
 #+title: Bash Scripts
 
+* EASYFOCUS
+
+bspwm keyboard driven window selection
+
+** Requirements
+
+- [[https://github.com/LemonBoy/bar][lemonbar]]
+- wmctrl
+
+*** Optional (EXPERIMENTAL)
+
+- Emacs integration with [[https://github.com/abo-abo/ace-window][ace-window]]
+  ace-window keybinding ~M-o~
+
 * COLOG
 
 Highlight matches
@@ -43,7 +57,6 @@ Case sensitive.
 #+BEGIN_SRC sh
 echo warn error debug info 10 nil | colog
 #+END_SRC
-
 
 * MINUS
 

@@ -1,0 +1,59 @@
+#!/bin/bash
+case $1 in
+-e|--emacs)
+    LABELS=(q r s t u v w x y z 1 2 3 4 5 6 7 8 9 0)
+    EMACS=0
+    ;;
+*)
+    LABELS=(a b c d e f g h i j k l m n o p q r s t u v w x y z)
+    ;;
+esac
+
+
+PIDS=()
+declare -A WINS
+IFS=$'\n'
+SCREENS=($(xrandr | sed -nr '/ connected /{s/^.* [0-9]+x[0-9]+\+([0-9]+)\+([0-9]+).*$/\1 \2/;p}' | sort -nr))
+ACTIVE="$(bspc query -D -d .active --names | xargs -I{} expr {} - 1)"
+for WIN_DATAS in $(wmctrl -lG)
+do
+    IFS=' '
+    DATAS=($WIN_DATAS)
+    echo "$ACTIVE" | grep ${DATAS[1]} >/dev/null || continue
+    POSX=$(expr ${DATAS[2]} / 2)
+    POSY=$(expr ${DATAS[3]} / 2)
+    for SCREEN in "${SCREENS[@]}"
+    do
+        SCR=($SCREEN)
+        if [ $POSX -ge ${SCR[0]} ]
+        then
+            POSY=$(expr $POSY - ${SCR[1]})
+            break
+        fi
+    done
+    LABEL="${LABELS[0]}"
+    WINS[$LABEL]=${DATAS[0]}
+    LABELS=("${LABELS[@]:1}")
+    echo "$LABEL" | lemonbar -dg "11x22+$POSX+$POSY" -B \#000000 -F \#FF0000 -p -f terminus-bold-22 &
+    PIDS+=($!)
+done
+
+[ "$EMACS" == 0 ] && (xdotool search --onlyvisible --class Emacs windowactivate --sync %1 keyup O Alt_L Super_L Super_R key Alt_L+O; EMACS=$?)
+
+RES="$(echo -e "abcdefghijklmnop\nqrstuvwxyz1234567890" | rofi -m -1 -dmenu -format f -auto-select -disable-history -theme-str '#window {enabled: false;}')"
+kill "${PIDS[@]}"
+
+if [ -n "${WINS[$RES]}" ]
+then
+    # [ "$EMACS" == 0 ] && xte 'keyup G' 'keyup Control_L' 'keyup Alt_L' 'keydown Control_L' 'key G' 'keyup Control_L'
+    [ "$EMACS" == 0 ] && xte 'keyup G' 'keyup Control_L' 'keyup Escape' 'keyup Alt_L' 'key Escape'
+    wmctrl -i -a "${WINS[$RES]}"
+else
+    if [ -n "$RES" ]
+    then
+        [ "$EMACS" == 0 ] && xte "keyup $RES" 'keyup Control_L' 'keyup Alt_L' "key $RES"
+    else
+        # [ "$EMACS" == 0 ] && xte 'keyup G' 'keyup Control_L' 'keyup Alt_L' 'keydown Control_L' 'key G' 'keyup Control_L'
+        [ "$EMACS" == 0 ] && xte 'keyup G' 'keyup Control_L' 'keyup Escape' 'keyup Alt_L' 'key Escape'
+    fi
+fi
