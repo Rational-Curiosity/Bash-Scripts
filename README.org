@@ -4,6 +4,10 @@
 
 [[https://github.com/baskerville/bspwm][bspwm]] keyboard driven window selection
 
+#+BEGIN_SRC sh
+easyfocus [--emacs|-e]
+#+END_SRC
+
 ** Requirements
 
 - [[https://github.com/LemonBoy/bar][lemonbar]]
