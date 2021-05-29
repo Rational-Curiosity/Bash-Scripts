@@ -14,6 +14,11 @@
 - Emacs integration with [[https://github.com/abo-abo/ace-window][ace-window]]
   ace-window keybinding ~M-o~
 
+* CAPSLOCK-WARN
+
+Bind this script to /capslock/ key. After 5 seconds of having pressed
+the /capslock/ key it alerts you if it remains locked.
+
 * COLOG
 
 Highlight matches
