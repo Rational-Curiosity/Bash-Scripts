@@ -19,6 +19,10 @@
 Bind this script to /capslock/ key. After 5 seconds of having pressed
 the /capslock/ key it alerts you if it remains locked.
 
+#+BEGIN_SRC sh
+capslock-warn [<seconds>]
+#+END_SRC
+
 * COLOG
 
 Highlight matches
