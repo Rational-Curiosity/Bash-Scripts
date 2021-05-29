@@ -2,7 +2,7 @@
 
 * EASYFOCUS
 
-[[https://github.com/baskerville/bspwm][bspwm]] keyboard driven window selection
+[[https://github.com/baskerville/bspwm][bspwm]] keyboard driven window selection.
 
 #+BEGIN_SRC sh
 easyfocus [--emacs|-e]
@@ -25,6 +25,14 @@ the /capslock/ key it alerts you if it remains locked.
 
 #+BEGIN_SRC sh
 capslock-warn [<seconds>]
+#+END_SRC
+
+* BSPWM-ACTIONS
+
+Rofi menu for bspwm.
+
+#+BEGIN_SRC sh
+bspwm-actions [resize|attribute|monitor]
 #+END_SRC
 
 * COLOG

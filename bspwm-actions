@@ -1,0 +1,213 @@
+#!/bin/bash
+ROFI_ARGS=(-m -1 -dmenu -filter '^' -matching regex -auto-select -disable-history -columns 4 -markup-rows -format p -theme-str '#element { children: [element-text];}')
+MENU=""
+
+
+bspwm_menu() {
+    local OPTS="\
+$1<span foreground='#f193f9'>r</span> restart bspwm
+<span foreground='#f193f9'>q</span> quit bspwm"
+    local OPT="$(echo "$OPTS" | rofi -mesg Windows "${ROFI_ARGS[@]}")"
+    case "$OPT" in
+    "- parent menu")
+        MENU=main
+        ;;
+    "r restart bspwm")
+        bspc wm -r
+        ;;
+    "q quit bspwm")
+        bspc quit
+        ;;
+    esac
+}
+
+
+attribute_menu() {
+    local OPTS="\
+$1<span foreground='#f193f9'>c</span> close window
+<span foreground='#f193f9'>k</span> kill window
+<span foreground='#f193f9'>t</span> tiled window
+<span foreground='#f193f9'>p</span> pseudo tiled window
+<span foreground='#f193f9'>s</span> floating window
+<span foreground='#f193f9'>f</span> fullscreen window
+<span foreground='#f193f9'>m</span> mark flag
+<span foreground='#f193f9'>x</span> lock flag
+<span foreground='#f193f9'>y</span> sticky flag
+<span foreground='#f193f9'>z</span> private flag"
+    local OPT="$(echo "$OPTS" | rofi -mesg Windows "${ROFI_ARGS[@]}")"
+    case "$OPT" in
+    "- parent menu")
+        MENU=main
+        ;;
+    "c close window")
+        bspc node -c
+        ;;
+    "k kill window")
+        bspc node -k
+        ;;
+    "t tiled window")
+        bspc node -t tiled
+        ;;
+    "p pseudo tiled window")
+        bspc node -t pseudo_tiled
+        ;;
+    "s floating window")
+        bspc node -t floating
+        ;;
+    "f fullscreen window")
+        bspc node -t fullscreen
+        ;;
+    "m mark window")
+        bspc node -g marked
+        ;;
+    "x lock window")
+        bspc node -g locked
+        ;;
+    "y sticky window")
+        bspc node -g sticky
+        ;;
+    "z private window")
+        bspc node -g private
+        ;;
+    esac
+}
+
+
+monitor_menu() {
+    local MONITORS="$(xrandr | sed -n 's/^\([^ ]*\) connected [^+]*+\([0-9]*\).*/\2 \1/p' | sort -n | cut -d' ' -f2)"
+    local LETTERS="\
+<span foreground='#f193f9'>a</span>
+<span foreground='#f193f9'>s</span>
+<span foreground='#f193f9'>d</span>
+<span foreground='#f193f9'>f</span>
+<span foreground='#f193f9'>q</span>
+<span foreground='#f193f9'>w</span>
+<span foreground='#f193f9'>e</span>
+<span foreground='#f193f9'>r</span>"
+    bspc monitor "$(paste -d' ' <(echo "$LETTERS" | head '-'"$(echo "$MONITORS" | wc -l)") <(echo "$MONITORS") | rofi -mesg Monitors "${ROFI_ARGS[@]}" | cut -d' ' -f2)" -f
+}
+
+
+resize_menu() {
+    local OPTS="\
+$1<span foreground='#f193f9'>h</span> decrease left
+<span foreground='#f193f9'>j</span> decrease down
+<span foreground='#f193f9'>k</span> decrease up
+<span foreground='#f193f9'>l</span> decrease right
+<span foreground='#f193f9'>H</span> increase left
+<span foreground='#f193f9'>J</span> increase down
+<span foreground='#f193f9'>K</span> increase up
+<span foreground='#f193f9'>L</span> increase right"
+    #FOCUSED=$(bspc query -N -n focused)
+    while true
+    do
+        local OPT="$(echo "$OPTS" | rofi -mesg Resize "${ROFI_ARGS[@]}")"
+        case "$OPT" in
+        "- parent menu")
+            MENU=$2
+            break
+            ;;
+        "h decrease left")
+            #bspc node $FOCUSED -z left 20 0
+            bspc node -z left 20 0
+            ;;
+        "j decrease down")
+            bspc node -z bottom 0 -20
+            ;;
+        "k decrease up")
+            bspc node -z top 0 20
+            ;;
+        "l decrease right")
+            bspc node -z right -20 0
+            ;;
+        "H increase left")
+            bspc node -z left -20 0
+            ;;
+        "J increase down")
+            bspc node -z bottom 0 20
+            ;;
+        "K increase up")
+            bspc node -z top 0 -20
+            ;;
+        "L increase right")
+            bspc node -z right 20 0
+            ;;
+        *)
+            break
+            ;;
+        esac
+    done
+}
+
+
+main_menu() {
+    local OPTS="\
+<span foreground='#f193f9'>r</span> run program
+<span foreground='#f193f9'>w</span> windows list
+<span foreground='#f193f9'>a</span> windows attributes
+<span foreground='#f193f9'>m</span> monitors list
+<span foreground='#f193f9'>b</span> bspwm menu"
+    local OPT="$(echo "$OPTS" | rofi -mesg Main "${ROFI_ARGS[@]}")"
+    case "$OPT" in
+    "r run program")
+        rofi -show run -columns 5
+        ;;
+    "w windows list")
+        rofi -i -show window -window-format "{c} {w} {t}"
+        ;;
+    "m monitors list")
+        monitor_menu
+        ;;
+    "a windows attributes")
+        attribute_menu "<span foreground='#f193f9'>-</span> parent menu
+"
+        while [ "$MENU" == "window" ]
+        do
+            MENU=""
+            attribute_menu "<span foreground='#f193f9'>-</span> parent menu
+"
+        done
+        ;;
+    "b bspwm menu")
+        bspwm_menu "<span foreground='#f193f9'>-</span> parent menu
+"
+        while [ "$MENU" == "bspwm" ]
+        do
+            MENU=""
+            bspwm_menu "<span foreground='#f193f9'>-</span> parent menu
+"
+        done
+        ;;
+    esac
+}
+
+
+case "$1" in
+resize)
+    resize_menu
+    ;;
+attribute)
+    attribute_menu
+    while [ "$MENU" == "main" ]
+    do
+        MENU=""
+        attribute_menu
+    done
+    ;;
+monitor)
+    monitor_menu
+    while [ "$MENU" == "main" ]
+    do
+        MENU=""
+        monitor_menu
+    done
+    ;;
+*)
+    main_menu
+    while [ "$MENU" == "main" ]
+    do
+        MENU=""
+        main_menu
+    done
+    ;;
+esac
