@@ -1,0 +1,54 @@
+#!/bin/bash
+DEV_PATH=""
+while [ "$#" -gt 0 ]
+do
+    if [ -z "$DEV_PATH" ]
+    then
+        DEV_PATH="$1"
+    else
+        >&2 echo "Too many targets"
+        DEV_PATH=""
+        break
+    fi
+    shift
+done
+
+if [ -n "$DEV_PATH" ]
+then
+    if [ -z "$SUDO_UID" ]
+    then
+        >&2 echo "Error: sudo prefix required"
+    else
+        if [ "$(stat -c "%u" "$DEV_PATH")" -ne "$SUDO_UID" ]
+        then
+            NAME="$(basename "$DEV_PATH")"
+            mkdir -p "$HOME/mnt/$NAME"
+            if bindfs -u $(id -u) -g $(id -g) "$DEV_PATH" "$HOME/mnt/$NAME"
+            then
+                echo "Binded at $HOME/mnt/$NAME"
+            else
+                rmdir "$HOME/mnt/$NAME"
+            fi
+        fi
+    fi
+else
+    DEVICES=($(lsblk -psrno NAME,TYPE,MOUNTPOINT,HOTPLUG | grep "part  1" | cut -d' ' -f1))
+    for DEVICE in "${DEVICES[@]}"
+    do
+        OUTPUT="$(udisksctl mount -b "$DEVICE")"
+        OUTPUT="${OUTPUT%.}"
+        echo "$OUTPUT"
+        DEV_PATH="/${OUTPUT##* at /}"
+        if [ -n "$SUDO_UID" ] && [ "$(stat -c "%u" "$DEV_PATH")" -ne "$SUDO_UID" ]
+        then
+            NAME="$(basename "$DEV_PATH")"
+            mkdir -p "$HOME/mnt/$NAME"
+            if bindfs -u $SUDO_UID -g $SUDO_GID "$DEV_PATH" "$HOME/mnt/$NAME"
+            then
+                echo "Binded at $HOME/mnt/$NAME"
+            else
+                rmdir "$HOME/mnt/$NAME"
+            fi
+        fi
+    done
+fi

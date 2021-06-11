@@ -1,0 +1,19 @@
+#!/bin/sh
+if FOLDERS="$(ls -d1 ~/mnt/* 2>/dev/null)"
+then
+    if [ -z "$SUDO_UID" ]
+    then
+        >&2 echo "Error: sudo prefix required"
+        exit 1
+    fi
+
+    if echo "$FOLDERS" | xargs -d $'\n' umount
+    then
+        echo "$FOLDERS" | xargs -d $'\n' -L 1 rmdir
+        echo "$FOLDERS" | xargs -d $'\n' -L 1 echo "Unbinded "
+    else
+        exit 2
+    fi
+fi
+
+lsblk -psrno NAME,TYPE,HOTPLUG,MOUNTPOINT | grep "part 1 /" | cut -d' ' -f1 | xargs -rL 1 udisksctl unmount -b

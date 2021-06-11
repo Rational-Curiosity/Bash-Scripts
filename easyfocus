@@ -11,15 +11,17 @@ esac
 
 
 PIDS=()
-declare -A WINS
+declare -A WINS DSKS ACTIVES
 IFS=$'\n'
+FOCUSED=$(bspc query -N -n .focused)
 SCREENS=($(xrandr | sed -nr '/ connected /{s/^.* [0-9]+x[0-9]+\+([0-9]+)\+([0-9]+).*$/\1 \2/;p}' | sort -nr))
-ACTIVE="$(bspc query -D -d .active --names | xargs -I{} expr {} - 1)"
+IDX=0; for NAME in $(bspc query -D --names); do DSKS[$NAME]=$((IDX++)); done
+for NAME in $(bspc query -D -d .active --names); do ACTIVES[${DSKS[$NAME]}]="$NAME"; done
 for WIN_DATAS in $(wmctrl -lG)
 do
     IFS=' '
     DATAS=($WIN_DATAS)
-    echo "$ACTIVE" | grep ${DATAS[1]} >/dev/null || continue
+    [ -n "${ACTIVES[${DATAS[1]}]}" ] || continue
     POSX=$(expr ${DATAS[2]} / 2)
     POSY=$(expr ${DATAS[3]} / 2)
     for SCREEN in "${SCREENS[@]}"
@@ -34,26 +36,49 @@ do
     LABEL="${LABELS[0]}"
     WINS[$LABEL]=${DATAS[0]}
     LABELS=("${LABELS[@]:1}")
-    echo "$LABEL" | lemonbar -dg "11x22+$POSX+$POSY" -B \#000000 -F \#FF0000 -p -f terminus-bold-22 &
+    if [ "${FOCUSED,,}" == "${DATAS[0]}" ]
+    then
+        echo "$LABEL" | lemonbar -dg "11x22+$POSX+$POSY" -B \#000000 -F \#FFFFFF -p -f terminus-bold-22 &
+    else
+        echo "$LABEL" | lemonbar -dg "11x22+$POSX+$POSY" -B \#000000 -F \#FF0000 -p -f terminus-bold-22 &
+    fi
     PIDS+=($!)
 done
 
-[ "$EMACS" == 0 ] && (xdotool search --onlyvisible --class Emacs windowactivate --sync %1 keyup O Alt_L Super_L Super_R key Alt_L+O; EMACS=$?)
+if [ "$EMACS" == 0 ]
+then
+    xdotool search --onlyvisible --class Emacs windowactivate --sync %1 keyup O Alt_L Super_L Super_R key Alt_L+O
+    EMACS=$?
+    bspc node -f $FOCUSED
+fi
 
-RES="$(echo -e "abcdefghijklmnop\nqrstuvwxyz1234567890" | rofi -m -1 -dmenu -format f -auto-select -disable-history -theme-str '#window {enabled: false;}')"
+RES="$(echo -e 'abcdefghijklmnop\nqrstuvwxyz1234567890\nS' | rofi -m -1 -dmenu -format f -auto-select -disable-history -theme-str '#window {enabled: false;}')"
+case "$RES" in
+S)
+    cmd () {
+        bspc node -s "$1" --follow
+    }
+    RES="$(echo -e 'abcdefghijklmnop\nqrstuvwxyz1234567890\nS' | rofi -m -1 -dmenu -format f -auto-select -disable-history -theme-str '#window {enabled: false;}')"
+    ;;
+*)
+    cmd () {
+        bspc node -f "$1"
+    }
+    ;;
+esac
 kill "${PIDS[@]}"
 
 if [ -n "${WINS[$RES]}" ]
 then
-    # [ "$EMACS" == 0 ] && xte 'keyup G' 'keyup Control_L' 'keyup Alt_L' 'keydown Control_L' 'key G' 'keyup Control_L'
-    [ "$EMACS" == 0 ] && xte 'keyup G' 'keyup Control_L' 'keyup Escape' 'keyup Alt_L' 'key Escape'
-    wmctrl -i -a "${WINS[$RES]}"
-else
+    [ "$EMACS" == 0 ] && (xdotool search --onlyvisible --class Emacs windowactivate --sync %1 keyup G Control_L Escape Alt_L key Escape; bspc node -f $FOCUSED)
+    cmd "${WINS[$RES]}"
+elif [ "$EMACS" == 0 ]
+then
     if [ -n "$RES" ]
     then
-        [ "$EMACS" == 0 ] && xte "keyup $RES" 'keyup Control_L' 'keyup Alt_L' "key $RES"
+        xdotool search --onlyvisible --class Emacs windowactivate --sync %1 keyup "$RES" Control_L Alt_L key "$RES"
     else
-        # [ "$EMACS" == 0 ] && xte 'keyup G' 'keyup Control_L' 'keyup Alt_L' 'keydown Control_L' 'key G' 'keyup Control_L'
-        [ "$EMACS" == 0 ] && xte 'keyup G' 'keyup Control_L' 'keyup Escape' 'keyup Alt_L' 'key Escape'
+        xdotool search --onlyvisible --class Emacs windowactivate --sync %1 keyup G Control_L Escape Alt_L key Escape
+        bspc node -f $FOCUSED
     fi
 fi
