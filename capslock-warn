@@ -6,9 +6,9 @@ else
     SECONDS=5
 fi
 CMD="$(basename $0)" # must be less than 15 characters long
-if xset q | grep --color=never -E "Caps Lock: +on"
+if xset q | grep --color=never -E "Caps Lock: +on" 2>&1 >/dev/null
 then
-    if ! ps --no-headers -C "$CMD" -o pid | grep -v $$
+    if ! ps --no-headers -C "$CMD" -o pid | grep -v $$ 2>&1 >/dev/null
     then
         sleep "$SECONDS" && notify-send --hint int:transient:1 -u critical -a notify-sleep Warning "CapsLock ON"
     fi

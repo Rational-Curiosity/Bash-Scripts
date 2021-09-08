@@ -1,5 +1,5 @@
 #!/bin/bash
-ROFI_ARGS=(-m -1 -dmenu -filter '^' -matching regex -auto-select -disable-history -columns 4 -markup-rows -format p -theme-str '#element { children: [element-text];}')
+ROFI_ARGS=(-m -1 -dmenu -filter '^' -matching regex -auto-select -disable-history -markup-rows -format p -theme-str '#element { children: [element-text];}')
 MENU=""
 
 
@@ -150,7 +150,7 @@ main_menu() {
     local OPT="$(echo "$OPTS" | rofi -mesg Main "${ROFI_ARGS[@]}")"
     case "$OPT" in
     "r run program")
-        rofi -show run -columns 5
+        rofi -show run
         ;;
     "w windows list")
         rofi -i -show window -window-format "{c} {w} {t}"

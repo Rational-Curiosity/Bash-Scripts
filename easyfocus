@@ -1,4 +1,6 @@
 #!/bin/bash
+# Logging
+#exec >> ~/easyfocus.log 2>&1
 case $1 in
 -e|--emacs)
     LABELS=(q r s t u v w x y z 1 2 3 4 5 6 7 8 9 0)
@@ -11,6 +13,7 @@ esac
 
 
 PIDS=()
+CHOICES=''
 declare -A WINS DSKS ACTIVES
 IFS=$'\n'
 FOCUSED=$(bspc query -N -n .focused)
@@ -22,18 +25,19 @@ do
     IFS=' '
     DATAS=($WIN_DATAS)
     [ -n "${ACTIVES[${DATAS[1]}]}" ] || continue
-    POSX=$(expr ${DATAS[2]} / 2)
-    POSY=$(expr ${DATAS[3]} / 2)
+    POSX=$((${DATAS[2]} / 2))
+    POSY=$((${DATAS[3]} / 2))
     for SCREEN in "${SCREENS[@]}"
     do
         SCR=($SCREEN)
         if [ $POSX -ge ${SCR[0]} ]
         then
-            POSY=$(expr $POSY - ${SCR[1]})
+            POSY=$(($POSY - ${SCR[1]}))
             break
         fi
     done
     LABEL="${LABELS[0]}"
+    CHOICES="$CHOICES\n$LABEL"
     WINS[$LABEL]=${DATAS[0]}
     LABELS=("${LABELS[@]:1}")
     if [ "${FOCUSED,,}" == "${DATAS[0]}" ]
@@ -44,6 +48,7 @@ do
     fi
     PIDS+=($!)
 done
+CHOICES="${CHOICES:1}"
 
 if [ "$EMACS" == 0 ]
 then
@@ -52,26 +57,38 @@ then
     bspc node -f $FOCUSED
 fi
 
-RES="$(echo -e 'abcdefghijklmnop\nqrstuvwxyz1234567890\nS' | rofi -m -1 -dmenu -format f -auto-select -disable-history -theme-str '#window {enabled: false;}')"
+
+# Commands
+cmd_letter () {
+    bspc node -f "$1"
+}
+cmd_number () {
+    bspc desktop -f $1
+}
+
+
+# Choices
+RES="$(echo -e "$CHOICES\n1234567890\nS" | rofi -m -1 -dmenu -format f -auto-select -kb-toggle-sort Alt+o -disable-history -theme-str '#window {enabled: false;}')"
 case "$RES" in
 S)
-    cmd () {
+    cmd_letter () {
         bspc node -s "$1" --follow
     }
-    RES="$(echo -e 'abcdefghijklmnop\nqrstuvwxyz1234567890\nS' | rofi -m -1 -dmenu -format f -auto-select -disable-history -theme-str '#window {enabled: false;}')"
-    ;;
-*)
-    cmd () {
-        bspc node -f "$1"
+    cmd_number () {
+        bspc node -d $1 --follow
     }
+    RES="$(echo -e "$CHOICES\n1234567890" | rofi -m -1 -dmenu -format f -auto-select -disable-history -theme-str '#window {enabled: false;}')"
     ;;
 esac
 kill "${PIDS[@]}"
 
-if [ -n "${WINS[$RES]}" ]
+if [[ $RES =~ ^[0-9]+$ ]]
+then
+    cmd_number $RES
+elif [ -n "${WINS[$RES]}" ]
 then
     [ "$EMACS" == 0 ] && (xdotool search --onlyvisible --class Emacs windowactivate --sync %1 keyup G Control_L Escape Alt_L key Escape; bspc node -f $FOCUSED)
-    cmd "${WINS[$RES]}"
+    cmd_letter "${WINS[$RES]}"
 elif [ "$EMACS" == 0 ]
 then
     if [ -n "$RES" ]

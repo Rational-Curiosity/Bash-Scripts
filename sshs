@@ -99,6 +99,51 @@ done
 if [ -n "$HOST" ]
 then
     case "$HOST" in
+    'raspberry')
+        TARGET="RaspberryPi"
+        if ping -c 1 192.168.1.201 &> /dev/null && [ -n "$(arp -n | grep -iE '192\.168\.1\.201.*b8:27:eb:c2:4b:9b')" ]
+        then
+            RUN="$RUN pi@192.168.1.201"
+        else
+            RUN="$RUN pi@92.185.251.248"
+        fi
+        ;;
+    'yun')
+        TARGET="ArduinoYun"
+        if ping -c 1 192.168.1.202 &> /dev/null && [ -n "$(arp -n | grep -iE '192\.168\.1\.202.*90:A2:DA:F0:4B:D2')" ]
+        then
+            RUN="$RUN root@192.168.1.202"
+        else
+            if [ -z "$PORT" ]
+            then
+                RUN="$RUN -p 23 root@92.185.251.248"
+            else
+                RUN="$RUN root@92.185.251.248"
+            fi
+        fi
+        ;;
+    'ubuntuserver')
+        TARGET="UbuntuServer"
+        if ping -c 1 192.168.1.202 &> /dev/null && [ -n "$(arp -n | grep -iE '192\.168\.1\.202.*40:16:7e:a9:05:84')" ]
+        then
+            RUN="$RUN techtalents@192.168.1.202"
+        else
+            if [ -z "$PORT" ]
+            then
+                RUN="$RUN -p 2222 techtalents@80.36.68.168"
+            else
+                RUN="$RUN techtalents@80.36.68.168"
+            fi
+        fi
+        ;;
+    'mobile')
+        if ping -c 1 192.168.1.251 && [ -n "$(arp -n | grep -E '192\.168\.1\.251.*ec:1f:72:49:72:2a')" ]
+        then
+            RUN="$RUN -p 2222 192.168.1.251"
+        else
+            >&2 echo "ERROR: mobile device not found"
+        fi
+        ;;
     'ev3')
         RUN="$RUN ev3@10.42.0.83"
         ;;
