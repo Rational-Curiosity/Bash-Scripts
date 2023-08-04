@@ -1,15 +1,23 @@
-#!/bin/bash
+#!/bin/sh
 DEV_PATH=""
+INTERACTIVE=false
 while [ "$#" -gt 0 ]
 do
-    if [ -z "$DEV_PATH" ]
-    then
-        DEV_PATH="$1"
-    else
-        >&2 echo "Too many targets"
-        DEV_PATH=""
-        break
-    fi
+    case "$1" in
+    -i)
+        INTERACTIVE=true
+        ;;
+    *)
+        if [ -z "$DEV_PATH" ]
+        then
+            DEV_PATH="$1"
+        else
+            >&2 echo "Too many targets"
+            DEV_PATH=""
+            break
+        fi
+        ;;
+    esac
     shift
 done
 
@@ -32,10 +40,23 @@ then
         fi
     fi
 else
-    DEVICES=($(lsblk -psrno NAME,TYPE,MOUNTPOINT,HOTPLUG | grep "part  1" | cut -d' ' -f1))
-    for DEVICE in "${DEVICES[@]}"
+    IFS='
+'
+    for DEVICE in $(lsblk -psrno NAME,TYPE,MOUNTPOINT,HOTPLUG,FSTYPE,LABEL | grep -E "(part|disk)  1 [^ ]" | sed 's/\\x20/ /g')
     do
-        OUTPUT="$(udisksctl mount -b "$DEVICE")"
+        if $INTERACTIVE
+        then
+            IFS=' '
+            read -p "Mount $(echo "$DEVICE" | sed 's/part  1//') [Y/n]? " RESPONSE
+            IFS='
+'
+            case $RESPONSE in
+            [Nn]*)
+                continue
+                ;;
+            esac
+        fi
+        OUTPUT="$(udisksctl mount -b "$(echo "$DEVICE" | cut -d' ' -f1)")"
         OUTPUT="${OUTPUT%.}"
         echo "$OUTPUT"
         DEV_PATH="/${OUTPUT##* at /}"

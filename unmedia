@@ -1,4 +1,15 @@
 #!/bin/sh
+INTERACTIVE=false
+while [ "$#" -gt 0 ]
+do
+    case "$1" in
+    -i)
+        INTERACTIVE=true
+        ;;
+    esac
+    shift
+done
+
 if FOLDERS="$(ls -d1 ~/mnt/* 2>/dev/null)"
 then
     if [ -z "$SUDO_UID" ]
@@ -7,13 +18,35 @@ then
         exit 1
     fi
 
-    if echo "$FOLDERS" | xargs -d $'\n' umount
+    if echo "$FOLDERS" | xargs -d '
+' umount
     then
-        echo "$FOLDERS" | xargs -d $'\n' -L 1 rmdir
-        echo "$FOLDERS" | xargs -d $'\n' -L 1 echo "Unbinded "
+        echo "$FOLDERS" | xargs -d '
+' -L 1 rmdir
+        echo "$FOLDERS" | xargs -d '
+' -L 1 echo "Unbinded "
     else
         exit 2
     fi
 fi
 
-lsblk -psrno NAME,TYPE,HOTPLUG,MOUNTPOINT | grep "part 1 /" | cut -d' ' -f1 | xargs -rL 1 udisksctl unmount -b
+if $INTERACTIVE
+then
+    IFS='
+'
+    for DEVICE in $(lsblk -psrno NAME,TYPE,HOTPLUG,MOUNTPOINT,FSTYPE,LABEL | grep -E "(part|disk) 1 /")
+    do
+        IFS=' '
+        read -p "Unmount $(echo "$DEVICE" | sed 's|part 1 /||') [Y/n]? " RESPONSE
+        IFS='
+'
+        case $RESPONSE in
+        [Nn]*)
+            continue
+            ;;
+        esac
+        udisksctl unmount -b "$(echo "$DEVICE" | cut -d' ' -f1)"
+    done
+else
+    lsblk -psrno NAME,TYPE,HOTPLUG,MOUNTPOINT | grep -E "(part|disk) 1 /" | cut -d' ' -f1 | xargs -rL 1 udisksctl unmount -b
+fi
