@@ -39,7 +39,8 @@ SYNC=false
 EXIT=(EVAL_ECHO '>&2 echo "${magenta}Return code:$normal $LAST_EXIT_CODE"')
 MAXDEPTH=3
 VERBOSE=false
-COLOR="always"
+COLOR=always
+EXCLUDE=external
 ECHO=(echo)
 GGIT_COND=:
 while [ "$#" -gt 0 ]
@@ -62,6 +63,8 @@ do
 
     --if <bash condition>     Enter in repo folder and run git
                                 if <bash condition>.
+    --exclude|-E <string>     Exclude <string> directories
+
     --maxdepth|-d <number>    Max depth folder search .git folders
                                 default 3.
     --continue|-c             Continue on git error, default stop.
@@ -105,6 +108,11 @@ Examples
     --if)
         shift
         GGIT_COND="$1"
+        shift
+        ;;
+    --exclude|-E)
+        shift
+        EXCLUDE="$1"
         shift
         ;;
     --maxdepth|-d)
@@ -200,14 +208,17 @@ fi
 
 DATE="$(date '+%Y-%m-%d')"
 DATETIME="$(date '+%Y-%m-%d_%H.%M.%S')"
-if type fdfind >/dev/null 2>&1
+if type fd >/dev/null 2>&1
 then
-    FINDER='fdfind -HI -t d -d $MAXDEPTH "^.git$" "$PWD"'
+    FINDER='fd -HI -E '\'"$EXCLUDE"\'' -t d -d $MAXDEPTH '\''^.git$'\'' "$PWD"'
+elif type fdfind >/dev/null 2>&1
+then
+    FINDER='fdfind -HI -E '\'"$EXCLUDE"\'' -t d -d $MAXDEPTH '\''^.git$'\'' "$PWD"'
 elif type fd-find >/dev/null 2>&1
 then
-    FINDER='fd-find -HI -t d -d $MAXDEPTH "^.git$" "$PWD"'
+    FINDER='fd-find -HI -E '\'"$EXCLUDE"\'' -t d -d $MAXDEPTH '\''^.git$'\'' "$PWD"'
 else
-    FINDER='find "$PWD" ! -readable -prune -o -maxdepth $MAXDEPTH -type d -name .git -print 2>/dev/null'
+    FINDER='find "$PWD" -maxdepth $MAXDEPTH ! -readable -prune -o -type d -name .git -not -path '\'"*/$EXCLUDE/*"\'' -print 2>/dev/null'
 fi
 
 for PWD in "${PWDS[@]}"
