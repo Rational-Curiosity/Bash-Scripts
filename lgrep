@@ -9,7 +9,7 @@ fi
 
 if [ -z "$2" ]
 then
-  lynx -dump -listonly "$1" | sed -r -e 's/ *[0-9]*\.? *//'
+  lynx -dump -listonly "$1" | sed -E -e 's/ *[0-9]*\.? *//'
 else
-  lynx -dump -listonly "$2" | sed -r -e 's/ *[0-9]*\.? *//' | grep -E "$1"
+  lynx -dump -listonly "$2" | sed -E -e 's/ *[0-9]*\.? *//' | grep -E "$1"
 fi

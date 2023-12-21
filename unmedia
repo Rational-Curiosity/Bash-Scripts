@@ -1,12 +1,34 @@
 #!/bin/sh
 INTERACTIVE=false
+ARGS=true
+PATTERN=
+process_args() {
+    if [ -z "$PATTERN" ]
+    then
+        PATTERN="$1"
+        INTERACTIVE=true
+    else
+        PATTERN="$PATTERN|$1"
+    fi
+}
 while [ "$#" -gt 0 ]
 do
-    case "$1" in
-    -i)
-        INTERACTIVE=true
-        ;;
-    esac
+    if $ARGS
+    then
+        case "$1" in
+        (--)
+            ARGS=false
+            ;;
+        (-i)
+            INTERACTIVE=true
+            ;;
+        (*)
+            process_args "$1"
+            ;;
+        esac
+    else
+        process_args "$1"
+    fi
     shift
 done
 
@@ -34,7 +56,8 @@ if $INTERACTIVE
 then
     IFS='
 '
-    for DEVICE in $(lsblk -psrno NAME,TYPE,HOTPLUG,MOUNTPOINT,FSTYPE,LABEL | grep -E "(part|disk) 1 /")
+    for DEVICE in $(lsblk -psrno NAME,TYPE,HOTPLUG,MOUNTPOINT,FSTYPE,LABEL \
+        | sed 's/\\x20/ /g' | grep -E "(part|disk) 1 /.*($PATTERN)")
     do
         IFS=' '
         read -p "Unmount $(echo "$DEVICE" | sed 's|part 1 /||') [Y/n]? " RESPONSE
@@ -48,5 +71,6 @@ then
         udisksctl unmount -b "$(echo "$DEVICE" | cut -d' ' -f1)"
     done
 else
-    lsblk -psrno NAME,TYPE,HOTPLUG,MOUNTPOINT | grep -E "(part|disk) 1 /" | cut -d' ' -f1 | xargs -rL 1 udisksctl unmount -b
+    lsblk -psrno NAME,TYPE,HOTPLUG,MOUNTPOINT | grep -E "(part|disk) 1 /" \
+        | cut -d' ' -f1 | xargs -rL 1 udisksctl unmount -b
 fi

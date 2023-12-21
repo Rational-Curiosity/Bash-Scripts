@@ -1,75 +1,67 @@
 #!/bin/sh
-DEV_PATH=""
 INTERACTIVE=false
+ARGS=true
+PATTERN=
+process_args() {
+    if [ -z "$PATTERN" ]
+    then
+        PATTERN="$1"
+        INTERACTIVE=true
+    else
+        PATTERN="$PATTERN|$1"
+    fi
+}
 while [ "$#" -gt 0 ]
 do
-    case "$1" in
-    -i)
-        INTERACTIVE=true
-        ;;
-    *)
-        if [ -z "$DEV_PATH" ]
-        then
-            DEV_PATH="$1"
-        else
-            >&2 echo "Too many targets"
-            DEV_PATH=""
-            break
-        fi
-        ;;
-    esac
+    if $ARGS
+    then
+        case "$1" in
+        (--)
+            ARGS=false
+            ;;
+        (-i)
+            INTERACTIVE=true
+            ;;
+        (*)
+            process_args "$1"
+            ;;
+        esac
+    else
+        process_args "$1"
+    fi
     shift
 done
 
-if [ -n "$DEV_PATH" ]
-then
-    if [ -z "$SUDO_UID" ]
+IFS='
+'
+for DEVICE in $(lsblk -psrno NAME,TYPE,MOUNTPOINT,HOTPLUG,FSTYPE,LABEL \
+    | sed 's/\\x20/ /g' | grep -E "(part|disk)  1 [^ ].*($PATTERN)")
+do
+    if $INTERACTIVE
     then
-        >&2 echo "Error: sudo prefix required"
-    else
-        if [ "$(stat -c "%u" "$DEV_PATH")" -ne "$SUDO_UID" ]
+        IFS=' '
+        read -p "Mount $(echo "$DEVICE" | sed 's/part  1//') [Y/n]? " RESPONSE
+        IFS='
+'
+        case $RESPONSE in
+        [Nn]*)
+            continue
+            ;;
+        esac
+    fi
+    OUTPUT="$(udisksctl mount -b "$(echo "$DEVICE" | cut -d' ' -f1)")"
+    OUTPUT="${OUTPUT%.}"
+    echo "$OUTPUT"
+    DEV_PATH="/${OUTPUT##* at /}"
+    if [ -n "$SUDO_UID" ] && [ "$(stat -c "%u" "$DEV_PATH")" -ne "$SUDO_UID" ]
+    then
+        NAME="$(basename "$DEV_PATH")"
+        mkdir -p "$HOME/mnt/$NAME"
+        if bindfs -u $SUDO_UID -g $SUDO_GID "$DEV_PATH" "$HOME/mnt/$NAME"
         then
-            NAME="$(basename "$DEV_PATH")"
-            mkdir -p "$HOME/mnt/$NAME"
-            if bindfs -u $(id -u) -g $(id -g) "$DEV_PATH" "$HOME/mnt/$NAME"
-            then
-                echo "Binded at $HOME/mnt/$NAME"
-            else
-                rmdir "$HOME/mnt/$NAME"
-            fi
+            echo "Binded at $HOME/mnt/$NAME"
+        else
+            rmdir "$HOME/mnt/$NAME"
         fi
     fi
-else
-    IFS='
-'
-    for DEVICE in $(lsblk -psrno NAME,TYPE,MOUNTPOINT,HOTPLUG,FSTYPE,LABEL | grep -E "(part|disk)  1 [^ ]" | sed 's/\\x20/ /g')
-    do
-        if $INTERACTIVE
-        then
-            IFS=' '
-            read -p "Mount $(echo "$DEVICE" | sed 's/part  1//') [Y/n]? " RESPONSE
-            IFS='
-'
-            case $RESPONSE in
-            [Nn]*)
-                continue
-                ;;
-            esac
-        fi
-        OUTPUT="$(udisksctl mount -b "$(echo "$DEVICE" | cut -d' ' -f1)")"
-        OUTPUT="${OUTPUT%.}"
-        echo "$OUTPUT"
-        DEV_PATH="/${OUTPUT##* at /}"
-        if [ -n "$SUDO_UID" ] && [ "$(stat -c "%u" "$DEV_PATH")" -ne "$SUDO_UID" ]
-        then
-            NAME="$(basename "$DEV_PATH")"
-            mkdir -p "$HOME/mnt/$NAME"
-            if bindfs -u $SUDO_UID -g $SUDO_GID "$DEV_PATH" "$HOME/mnt/$NAME"
-            then
-                echo "Binded at $HOME/mnt/$NAME"
-            else
-                rmdir "$HOME/mnt/$NAME"
-            fi
-        fi
-    done
-fi
+done

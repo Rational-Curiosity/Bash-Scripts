@@ -1,0 +1,105 @@
+#!/bin/sh
+set -e
+SCRIPT="$(basename "$0")"
+NL='
+'
+if [ -t 1 ]
+then
+    ncolors=$(tput colors)
+    if [ -n "$ncolors" -a "$ncolors" -ge 8 ]
+    then
+        blue="$(tput setaf 4)"
+        green="$(tput setaf 2)"
+        red="$(tput setaf 1)"
+        yellow="$(tput setaf 3)"
+        normal="$(tput sgr0)"
+    fi
+fi
+_fix() {
+    if ! type "$FMT" >/dev/null
+    then
+        >&2 echo "${blue}[$SCRIPT] ${red}Formatter $normal'$FMT' ${red}not found$normal"
+        exit 2
+    fi
+    case "$FMT" in
+    biome)
+        printf '%s' "$FILES" | xargs -d '\n' biome check --apply || true
+        printf '%s' "$FILES" | xargs -d '\n' biome format --write
+        ;;
+    ruff)
+        printf '%s' "$FILES" | xargs -d '\n' ruff check --fix --exit-zero
+        printf '%s' "$FILES" | xargs -d '\n' ruff format
+        ;;
+    php-cs-fixer)
+        printf '%s' "$FILES" | xargs -d '\n' php-cs-fixer fix
+        ;;
+    clang-format)
+        printf '%s' "$FILES" | xargs -d '\n' clang-format -i
+        ;;
+    rustfmt)
+        printf '%s' "$FILES" | xargs -d '\n' rustfmt --edition 2021
+        ;;
+    *)
+        >&2 echo "${blue}[$SCRIPT] ${red}Unknown formatter$normal '$FMT'"
+        exit 2
+    esac
+    local CODE=$?
+    if [ "$GIT_ARG" = '--cached' ]
+    then
+        printf '%s' "$FILES" | xargs -d '\n' git add
+    fi
+    echo "${blue}[$SCRIPT]$normal Fixed $(echo "$FILES"|wc -l) files with '$FMT' (exit code $CODE)"
+}
+_process() {
+    if [ -z "$FMT" ]
+    then
+        FMT="$1"
+        FILES="$FILE"
+    elif [ "$FMT" != "$1" ]
+    then
+        _fix
+        FMT="$1"
+        FILES="$FILE"
+    else
+        FILES="$FILES$NL$FILE"
+    fi
+}
+IFS="$NL"
+FMT=
+FILES=
+case "$1" in
+--unstaged|unstaged|un)
+    GIT_ARG=;;
+*)
+    GIT_ARG='--cached';;
+esac
+for FILE in $(git diff $GIT_ARG --name-only --diff-filter=AM | xargs -d '\n' ls -1 --sort=extension)
+do
+    case "$FILE" in
+    *.cts|*.mts|*.ts|*.tsx|*.cjs|*.js|*.jsx|*.mjs|*.json)
+        _process biome
+        ;;
+    *.py|*.pyi)
+        _process ruff
+        ;;
+    *.php|*.php3|*.php4|*.php5|*.php7|*.php8|*.pht|*.phtml)
+        _process php-cs-fixer
+        ;;
+    *.[cChH]|*.[cChH].in|*.[ch]pp|*.[ch]pp.in|*.[ch]xx|*.[ch]xx.in|*.cc|*.cc.in|*.hh|*.hh.in|*.inl|*.cats)
+        _process clang-format
+        ;;
+    *.java|*.jsp|*.jspx|*.properties|*.cs)
+        _process clang-format
+        ;;
+    *.rs)
+        _process rustfmt
+        ;;
+    *)
+        >&2 echo "${blue}[$SCRIPT] ${yellow}No support for:$normal '$FILE'"
+        ;;
+    esac
+done
+if [ -n "$FMT" ]
+then
+    _fix
+fi
