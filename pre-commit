@@ -1,8 +1,6 @@
 #!/bin/sh
 set -e
 SCRIPT="$(basename "$0")"
-NL='
-'
 if [ -t 1 ]
 then
     ncolors=$(tput colors)
@@ -16,90 +14,92 @@ then
     fi
 fi
 _fix() {
+    local FMT="$1"
+    local FLS="$2"
+    if [ -z "$FLS" ]
+    then
+        return
+    fi
     if ! type "$FMT" >/dev/null
     then
-        >&2 echo "${blue}[$SCRIPT] ${red}Formatter $normal'$FMT' ${red}not found$normal"
+        >&2 echo "${blue}[$SCRIPT] ${red}Program $normal'$FMT' ${red}not found$normal"
         exit 2
     fi
     case "$FMT" in
     biome)
-        printf '%s' "$FILES" | xargs -d '\n' biome check --apply || true
-        printf '%s' "$FILES" | xargs -d '\n' biome format --write
+        printf '%s' "$FLS" | xargs -d '\n' biome check --apply || true
+        printf '%s' "$FLS" | xargs -d '\n' biome format --write
         ;;
     ruff)
-        printf '%s' "$FILES" | xargs -d '\n' ruff check --fix --exit-zero
-        printf '%s' "$FILES" | xargs -d '\n' ruff format
+        printf '%s' "$FLS" | xargs -d '\n' ruff check --fix --exit-zero
+        printf '%s' "$FLS" | xargs -d '\n' ruff format
         ;;
     php-cs-fixer)
-        printf '%s' "$FILES" | xargs -d '\n' php-cs-fixer fix
+        printf '%s' "$FLS" | xargs -d '\n' php-cs-fixer fix
         ;;
     clang-format)
-        printf '%s' "$FILES" | xargs -d '\n' clang-format -i
+        printf '%s' "$FLS" | xargs -d '\n' clang-format -i
         ;;
     rustfmt)
-        printf '%s' "$FILES" | xargs -d '\n' rustfmt --edition 2021
+        # cargo clippy --fix
+        printf '%s' "$FLS" | xargs -d '\n' rustfmt --edition 2021
         ;;
     *)
-        >&2 echo "${blue}[$SCRIPT] ${red}Unknown formatter$normal '$FMT'"
+        >&2 echo "${blue}[$SCRIPT] ${red}Unknown program$normal '$FMT'"
         exit 2
     esac
     local CODE=$?
-    if [ "$GIT_ARG" = '--cached' ]
-    then
-        printf '%s' "$FILES" | xargs -d '\n' git add
-    fi
-    echo "${blue}[$SCRIPT]$normal Fixed $(echo "$FILES"|wc -l) files with '$FMT' (exit code $CODE)"
+    echo "${blue}[$SCRIPT]$normal Fixed $(echo -n "$FLS"|wc -l) files with '$FMT' (exit code $CODE)"
 }
-_process() {
-    if [ -z "$FMT" ]
+
+PARENT_PID=$PPID
+while [ "$PARENT_PID" -gt 1 ]
+do
+    IFS=' ' read -r PARENT_PID PARENT_COM <<-EOF
+	$(ps -p $PARENT_PID -o ppid=,comm=)
+	EOF
+    if [ "$PARENT_COM" = git ]
     then
-        FMT="$1"
-        FILES="$FILE"
-    elif [ "$FMT" != "$1" ]
-    then
-        _fix
-        FMT="$1"
-        FILES="$FILE"
-    else
-        FILES="$FILES$NL$FILE"
+        GIT_ARG=--cached
+        break
     fi
-}
-IFS="$NL"
-FMT=
-FILES=
-case "$1" in
---unstaged|unstaged|un)
-    GIT_ARG=;;
-*)
-    GIT_ARG='--cached';;
-esac
-for FILE in $(git diff $GIT_ARG --name-only --diff-filter=AM | xargs -d '\n' ls -1 --sort=extension)
+done
+
+FILES="$(git diff $GIT_ARG --name-only --diff-filter=AM)"
+IFS='
+'
+for FILE in $FILES
 do
     case "$FILE" in
     *.cts|*.mts|*.ts|*.tsx|*.cjs|*.js|*.jsx|*.mjs|*.json)
-        _process biome
+        FILES_BIOME="$FILES_BIOME$FILE$IFS"
         ;;
     *.py|*.pyi)
-        _process ruff
+        FILES_RUFF="$FILES_RUFF$FILE$IFS"
         ;;
     *.php|*.php3|*.php4|*.php5|*.php7|*.php8|*.pht|*.phtml)
-        _process php-cs-fixer
+        FILES_PHP_CS_FIXER="$FILES_PHP_CS_FIXER$FILE$IFS"
         ;;
     *.[cChH]|*.[cChH].in|*.[ch]pp|*.[ch]pp.in|*.[ch]xx|*.[ch]xx.in|*.cc|*.cc.in|*.hh|*.hh.in|*.inl|*.cats)
-        _process clang-format
+        FILES_CLANG_FORMAT="$FILES_CLANG_FORMAT$FILE$IFS"
         ;;
     *.java|*.jsp|*.jspx|*.properties|*.cs)
-        _process clang-format
+        FILES_CLANG_FORMAT="$FILES_CLANG_FORMAT$FILE$IFS"
         ;;
     *.rs)
-        _process rustfmt
+        FILES_RUSTFMT="$FILES_RUSTFMT$FILE$IFS"
         ;;
     *)
         >&2 echo "${blue}[$SCRIPT] ${yellow}No support for:$normal '$FILE'"
         ;;
     esac
 done
-if [ -n "$FMT" ]
+_fix 'biome' "$FILES_BIOME"
+_fix 'ruff' "$FILES_RUFF"
+_fix 'php-cs-fixer' "$FILES_PHP_CS_FIXER"
+_fix 'clang-format' "$FILES_CLANG_FORMAT"
+_fix 'rustfmt' "$FILES_RUSTFMT"
+if [ "$GIT_ARG" = '--cached' ]
 then
-    _fix
+    printf '%s' "$FILES" | xargs -d '\n' git add
 fi
