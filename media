@@ -1,4 +1,16 @@
 #!/bin/sh
+# check if stdout is a terminal...
+if [ -t 1 ]
+then
+    __echo() {
+        echo "$@"
+    }
+else
+    __echo() {
+        dunstify -a media "$@"
+    }
+fi
+
 INTERACTIVE=false
 ARGS=true
 PATTERN=
@@ -51,7 +63,7 @@ do
     fi
     OUTPUT="$(udisksctl mount -b "$(echo "$DEVICE" | cut -d' ' -f1)")"
     OUTPUT="${OUTPUT%.}"
-    echo "$OUTPUT"
+    __echo "$OUTPUT"
     DEV_PATH="/${OUTPUT##* at /}"
     if [ -n "$SUDO_UID" ] && [ "$(stat -c "%u" "$DEV_PATH")" -ne "$SUDO_UID" ]
     then
@@ -59,7 +71,7 @@ do
         mkdir -p "$HOME/mnt/$NAME"
         if bindfs -u $SUDO_UID -g $SUDO_GID "$DEV_PATH" "$HOME/mnt/$NAME"
         then
-            echo "Binded at $HOME/mnt/$NAME"
+            __echo "Binded at $HOME/mnt/$NAME"
         else
             rmdir "$HOME/mnt/$NAME"
         fi

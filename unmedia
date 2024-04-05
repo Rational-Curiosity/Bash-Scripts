@@ -1,4 +1,16 @@
 #!/bin/sh
+# check if stdout is a terminal...
+if [ -t 1 ]
+then
+    __echo() {
+        echo "$@"
+    }
+else
+    __echo() {
+        dunstify -a unmedia "$@"
+    }
+fi
+
 INTERACTIVE=false
 ARGS=true
 PATTERN=
@@ -68,9 +80,9 @@ then
             continue
             ;;
         esac
-        udisksctl unmount -b "$(echo "$DEVICE" | cut -d' ' -f1)"
+        __echo "$(udisksctl unmount -b "$(echo "$DEVICE" | cut -d' ' -f1)")"
     done
 else
-    lsblk -psrno NAME,TYPE,HOTPLUG,MOUNTPOINT | grep -E "(part|disk) 1 /" \
-        | cut -d' ' -f1 | xargs -rL 1 udisksctl unmount -b
+    __echo "$(lsblk -psrno NAME,TYPE,HOTPLUG,MOUNTPOINT | grep -E "(part|disk) 1 /" \
+        | cut -d' ' -f1 | xargs -rL 1 udisksctl unmount -b)"
 fi
